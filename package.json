@@ -1,6 +1,6 @@
 {
   "name": "@absolutejs/agency",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Provider-agnostic action authorization for AI agents: policy, approvals, execution leases, receipts, kill switches, signed handoffs, simulation, and AuthZEN adapters.",
   "type": "module",
   "license": "MIT",

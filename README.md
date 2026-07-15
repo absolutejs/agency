@@ -68,6 +68,24 @@ Memory stores are development defaults. Production deployments should supply
 durable, transactional stores for Agency state, kill switches, and handoff
 nonces.
 
+### PostgreSQL production state
+
+`agencyPostgresSchemaSql()` creates indexed tables for actions, approvals,
+leases, receipts, kill switches, and replay nonces. The adapters accept a small
+structural `AgencySqlClient`, so Bun SQL, Neon, `pg`, and transaction-aware host
+clients can be used without coupling the core package to a database driver.
+
+```ts
+const store = createPostgresAgencyStore({ client: sqlClient });
+const controlStore = createPostgresAgentControlStore({ client: sqlClient });
+const replayStore = createPostgresHandoffReplayStore({ client: sqlClient });
+```
+
+Lease consumption is one conditional `UPDATE`, making concurrent execution
+attempts safe across processes. Handoff nonces are persisted as SHA-256 digests,
+not bearer values. Apply `agencyPostgresSchemaSql()` during deployment before
+starting workers.
+
 Security invariants:
 
 - Approval is bound to the canonical action, actor, resource, effects, input

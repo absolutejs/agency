@@ -22,6 +22,14 @@ export {
 } from "./handoff";
 export { simulateAction } from "./simulation";
 export {
+  agencyPostgresSchemaSql,
+  createPostgresAgencyStore,
+  createPostgresAgentControlStore,
+  createPostgresHandoffReplayStore,
+  type AgencySqlClient,
+  type AgencySqlResult,
+} from "./postgres";
+export {
   agencyEventToTelemetry,
   createAgencyTelemetryEmitter,
   type AgentTelemetryRecord,
