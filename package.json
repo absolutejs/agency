@@ -1,7 +1,7 @@
 {
   "name": "@absolutejs/agency",
-  "version": "0.1.0",
-  "description": "Provider-agnostic action authorization for AI agents: policy decisions, approval prerequisites, single-use execution leases, receipts, and AuthZEN adapters.",
+  "version": "0.2.0",
+  "description": "Provider-agnostic action authorization for AI agents: policy, approvals, execution leases, receipts, kill switches, signed handoffs, simulation, and AuthZEN adapters.",
   "type": "module",
   "license": "MIT",
   "author": "Alex Kahn",
@@ -51,7 +51,7 @@
     "release": "bun run format && bun run check:package && bun publish"
   },
   "dependencies": {
-    "@absolutejs/manifest": "^0.1.1",
+    "@absolutejs/manifest": "^0.2.0",
     "@sinclair/typebox": "^0.34.0"
   },
   "devDependencies": {
@@ -60,6 +60,6 @@
     "typescript": "^5.9.0"
   },
   "absolutejs": {
-    "manifestContract": 1
+    "manifestContract": 2
   }
 }

@@ -5,12 +5,12 @@ import type { Agency, AgencyOptions } from "./index";
 const tool = toolFactory<Agency>();
 
 export const manifest = defineManifest<AgencyOptions, Agency>()({
-  contract: 1,
+  contract: 2,
   identity: {
     accent: "#7c3aed",
     category: "auth",
     description:
-      "Provider-neutral action authorization for AI agents, including exact-input approval binding, policy re-evaluation, single-use execution leases, and immutable receipts.",
+      "Provider-neutral action authorization for AI agents, including exact-input approval binding, policy re-evaluation, single-use execution leases, signed handoffs, simulation, kill switches, and immutable receipts.",
     docsUrl: "https://github.com/absolutejs/agency",
     name: "@absolutejs/agency",
     tagline: "Control and audit what AI agents may do.",
@@ -26,6 +26,10 @@ export const manifest = defineManifest<AgencyOptions, Agency>()({
   tools: {
     inspect_agent_actions: tool.runtime({
       annotations: { readOnlyHint: true },
+      authorization: {
+        effects: ["read"],
+        requiredScopes: ["agency:inspect"],
+      },
       description:
         "Inspect an agent action ledger including requests, approvals, execution leases, and receipts.",
       handler: async ({ agentId }, agency) =>

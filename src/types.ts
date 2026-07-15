@@ -137,6 +137,7 @@ export type AgencyEvent =
   | { actionId: string; receipt: ActionReceipt; type: "action.completed" };
 
 export type AgencyOptions = {
+  control?: { assertActive: (agentId: string) => Promise<void> | void };
   defaultLeaseTtlMs?: number;
   emit?: (event: AgencyEvent) => Promise<void> | void;
   now?: () => number;

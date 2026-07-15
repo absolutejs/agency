@@ -18,6 +18,7 @@ const required = <Value>(value: Value | undefined, message: string): Value => {
 };
 
 export const createAgency = ({
+  control,
   defaultLeaseTtlMs = DEFAULT_LEASE_TTL_MS,
   emit,
   now = Date.now,
@@ -36,6 +37,7 @@ export const createAgency = ({
   };
 
   const request = async (input: ActionRequestInput) => {
+    await control?.assertActive(input.actor.agentId);
     const createdAt = now();
     const action: ActionRequest = {
       ...input,
@@ -84,6 +86,7 @@ export const createAgency = ({
 
   const issueLease = async (actionId: string) => {
     const action = required(await store.getAction(actionId), "Unknown action");
+    await control?.assertActive(action.actor.agentId);
     const approval = await store.getApproval(actionId);
     const currentTime = now();
     if (action.expiresAt !== undefined && action.expiresAt <= currentTime) {
@@ -138,6 +141,7 @@ export const createAgency = ({
       await store.getAction(lease.actionId),
       "Unknown action",
     );
+    await control?.assertActive(action.actor.agentId);
     const startedAt = now();
     if (lease.expiresAt <= startedAt)
       throw new Error("Execution lease has expired");

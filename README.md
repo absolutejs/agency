@@ -43,6 +43,31 @@ contains adapters for the OpenID AuthZEN Authorization API, its Access Request
 and Approval Profile (AARP), and MCP tool mappings compatible with the COAZ
 profile direction.
 
+## Agentic control plane
+
+`createAgentControlPlane()` inventories an agent's registrations, delegations,
+tasks, credential grants, allowances, mandates, leases, and other capabilities
+through small `AgentControlSource` adapters. Revocation activates a durable kill
+switch first, then fans out cleanup to every source. Pass the control plane to
+`createAgency({ control, ... })`; action requests, lease issuance, and execution
+then fail closed while the agent is disabled.
+
+## Handoffs, simulation, and telemetry
+
+- `signAgentHandoff()` / `verifyAgentHandoff()` create audience-bound,
+  expiring, replay-protected agent-to-agent capability envelopes. Use
+  `attenuateAgentHandoff()` for additional hops so scopes, spend, expiry, and
+  user identity cannot escalate.
+- `simulateAction()` evaluates policy and produces the same canonical binding
+  without storing an action, issuing a lease, or running an effect.
+- `createAgencyTelemetryEmitter()` maps every Agency event to stable
+  `agent.*` event names and attributes that can feed OpenTelemetry or any audit
+  sink without coupling the core package to a telemetry vendor.
+
+Memory stores are development defaults. Production deployments should supply
+durable, transactional stores for Agency state, kill switches, and handoff
+nonces.
+
 Security invariants:
 
 - Approval is bound to the canonical action, actor, resource, effects, input

@@ -2,6 +2,30 @@ export { actionBinding, canonicalJson, digest } from "./canonical";
 export { createAgency, type Agency } from "./engine";
 export { createMemoryAgencyStore } from "./memory";
 export { allowAllPolicy, denyAllPolicy } from "./policies";
+export {
+  createAgentControlPlane,
+  createMemoryAgentControlStore,
+  type AgentControlItem,
+  type AgentControlPlane,
+  type AgentControlSource,
+  type AgentControlStore,
+  type AgentKillSwitch,
+} from "./control";
+export {
+  attenuateAgentHandoff,
+  createMemoryHandoffReplayStore,
+  signAgentHandoff,
+  verifyAgentHandoff,
+  type AgentHandoffClaims,
+  type HandoffReplayStore,
+  type SignedAgentHandoff,
+} from "./handoff";
+export { simulateAction } from "./simulation";
+export {
+  agencyEventToTelemetry,
+  createAgencyTelemetryEmitter,
+  type AgentTelemetryRecord,
+} from "./telemetry";
 export type {
   ActionApproval,
   ActionDecision,
