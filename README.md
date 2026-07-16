@@ -54,6 +54,32 @@ then fail closed while the agent is disabled.
 
 ## Handoffs, simulation, and telemetry
 
+`createAgentDelegationAuthority()` issues durable, revocable delegation grants
+inside Agency. Every child must attenuate its parent's user, audience, expiry,
+action scopes, effects, resource boundaries, and spend ceiling; delegation
+depth is bounded and revocation cascades to descendants. Pass the authority as
+`createAgency({ delegations: authority, ... })` to re-check the complete active
+chain when an action is requested, when its execution lease is issued, and
+immediately before that lease is consumed.
+
+```ts
+const delegations = createAgentDelegationAuthority({
+  audience: "https://app.example",
+  store: createMemoryAgentDelegationStore(), // use PostgreSQL in production
+});
+
+const grant = await delegations.issue({
+  audience: "https://app.example",
+  issuerAgentId: "user-agent",
+  subjectAgentId: "calendar-agent",
+  userId: "user-1",
+  scopes: ["calendar.create"],
+  effects: ["write", "external-network"],
+  resourceTypes: ["calendar"],
+  expiresAt: Date.now() + 3_600_000,
+});
+```
+
 - `signAgentHandoff()` / `verifyAgentHandoff()` create audience-bound,
   expiring, replay-protected agent-to-agent capability envelopes. Use
   `attenuateAgentHandoff()` for additional hops so scopes, spend, expiry, and

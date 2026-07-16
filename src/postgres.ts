@@ -1,5 +1,6 @@
 import { digest } from "./canonical";
 import type { AgentControlStore, AgentKillSwitch } from "./control";
+import type { AgentDelegation, AgentDelegationStore } from "./delegation";
 import type { HandoffReplayStore } from "./handoff";
 import type { AgencyStore } from "./types";
 
@@ -61,7 +62,19 @@ CREATE TABLE IF NOT EXISTS ${ns}.handoff_nonces (
   nonce_hash text PRIMARY KEY,
   expires_at bigint NOT NULL
 );
-CREATE INDEX IF NOT EXISTS handoff_nonces_expiry_idx ON ${ns}.handoff_nonces (expires_at);`;
+CREATE INDEX IF NOT EXISTS handoff_nonces_expiry_idx ON ${ns}.handoff_nonces (expires_at);
+CREATE TABLE IF NOT EXISTS ${ns}.delegations (
+  delegation_id text PRIMARY KEY,
+  parent_delegation_id text REFERENCES ${ns}.delegations(delegation_id),
+  issuer_agent_id text NOT NULL,
+  subject_agent_id text NOT NULL,
+  expires_at bigint NOT NULL,
+  revoked_at bigint,
+  data jsonb NOT NULL
+);
+CREATE INDEX IF NOT EXISTS delegations_subject_idx ON ${ns}.delegations (subject_agent_id, expires_at DESC);
+CREATE INDEX IF NOT EXISTS delegations_issuer_idx ON ${ns}.delegations (issuer_agent_id, expires_at DESC);
+CREATE INDEX IF NOT EXISTS delegations_parent_idx ON ${ns}.delegations (parent_delegation_id);`;
 };
 
 type DataRow<Value> = { data: Value };
@@ -227,6 +240,54 @@ export const createPostgresHandoffReplayStore = ({
         [nonceHash, expiresAt],
       );
       return result.rowCount === 1;
+    },
+  };
+};
+
+export const createPostgresAgentDelegationStore = ({
+  client,
+  namespace = "agency",
+}: {
+  client: AgencySqlClient;
+  namespace?: string;
+}): AgentDelegationStore => {
+  const ns = namespaceOf(namespace);
+  return {
+    get: async (id) =>
+      (
+        await client.query<DataRow<AgentDelegation>>(
+          `SELECT data FROM ${ns}.delegations WHERE delegation_id=$1`,
+          [id],
+        )
+      ).rows[0]?.data,
+    listForAgent: async (agentId) =>
+      (
+        await client.query<DataRow<AgentDelegation>>(
+          `SELECT data FROM ${ns}.delegations WHERE issuer_agent_id=$1 OR subject_agent_id=$1 ORDER BY expires_at DESC`,
+          [agentId],
+        )
+      ).rows.map(({ data }) => data),
+    revokeTree: async (id, revokedAt) =>
+      (
+        await client.query(
+          `WITH RECURSIVE tree AS (SELECT delegation_id FROM ${ns}.delegations WHERE delegation_id=$1 UNION ALL SELECT child.delegation_id FROM ${ns}.delegations child JOIN tree parent ON child.parent_delegation_id=parent.delegation_id) UPDATE ${ns}.delegations SET revoked_at=$2, data=jsonb_set(data,'{revokedAt}',to_jsonb($2::bigint),true) WHERE delegation_id IN (SELECT delegation_id FROM tree) AND revoked_at IS NULL`,
+          [id, revokedAt],
+        )
+      ).rowCount,
+    save: async (grant) => {
+      const result = await client.query(
+        `INSERT INTO ${ns}.delegations (delegation_id,parent_delegation_id,issuer_agent_id,subject_agent_id,expires_at,revoked_at,data) VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb) ON CONFLICT (delegation_id) DO NOTHING`,
+        [
+          grant.delegationId,
+          grant.parentDelegationId ?? null,
+          grant.issuerAgentId,
+          grant.subjectAgentId,
+          grant.expiresAt,
+          grant.revokedAt ?? null,
+          JSON.stringify(grant),
+        ],
+      );
+      if (result.rowCount !== 1) throw new Error("Delegation already exists");
     },
   };
 };

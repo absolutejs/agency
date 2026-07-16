@@ -1,6 +1,13 @@
 export { actionBinding, canonicalJson, digest } from "./canonical";
 export { createAgency, type Agency } from "./engine";
 export { createMemoryAgencyStore } from "./memory";
+export {
+  createAgentDelegationAuthority,
+  createMemoryAgentDelegationStore,
+  type AgentDelegation,
+  type AgentDelegationInput,
+  type AgentDelegationStore,
+} from "./delegation";
 export { allowAllPolicy, denyAllPolicy } from "./policies";
 export {
   createAgentControlPlane,
@@ -28,6 +35,7 @@ export { simulateAction } from "./simulation";
 export {
   agencyPostgresSchemaSql,
   createPostgresAgencyStore,
+  createPostgresAgentDelegationStore,
   createPostgresAgentControlStore,
   createPostgresHandoffReplayStore,
   type AgencySqlClient,

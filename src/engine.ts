@@ -19,6 +19,7 @@ const required = <Value>(value: Value | undefined, message: string): Value => {
 
 export const createAgency = ({
   control,
+  delegations,
   defaultLeaseTtlMs = DEFAULT_LEASE_TTL_MS,
   emit,
   now = Date.now,
@@ -38,9 +39,17 @@ export const createAgency = ({
 
   const request = async (input: ActionRequestInput) => {
     await control?.assertActive(input.actor.agentId);
+    const delegation = await delegations?.assertAllows(input);
     const createdAt = now();
+    const delegatedExpiry = Math.min(
+      input.expiresAt ?? Number.POSITIVE_INFINITY,
+      delegation?.expiresAt ?? Number.POSITIVE_INFINITY,
+    );
     const action: ActionRequest = {
       ...input,
+      ...(Number.isFinite(delegatedExpiry)
+        ? { expiresAt: delegatedExpiry }
+        : {}),
       actionId: `act_${crypto.randomUUID()}`,
       createdAt,
       inputDigest: await digest(input.input ?? null),
@@ -87,6 +96,7 @@ export const createAgency = ({
   const issueLease = async (actionId: string) => {
     const action = required(await store.getAction(actionId), "Unknown action");
     await control?.assertActive(action.actor.agentId);
+    const delegation = await delegations?.assertAllows(action);
     const approval = await store.getApproval(actionId);
     const currentTime = now();
     if (action.expiresAt !== undefined && action.expiresAt <= currentTime) {
@@ -109,6 +119,7 @@ export const createAgency = ({
       expiresAt: Math.min(
         issuedAt + defaultLeaseTtlMs,
         action.expiresAt ?? Number.POSITIVE_INFINITY,
+        delegation?.expiresAt ?? Number.POSITIVE_INFINITY,
         approval?.approvedUntil ?? Number.POSITIVE_INFINITY,
         decision.expiresAt ?? Number.POSITIVE_INFINITY,
       ),
@@ -142,6 +153,7 @@ export const createAgency = ({
       "Unknown action",
     );
     await control?.assertActive(action.actor.agentId);
+    await delegations?.assertAllows(action);
     const startedAt = now();
     if (lease.expiresAt <= startedAt)
       throw new Error("Execution lease has expired");

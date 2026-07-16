@@ -138,6 +138,11 @@ export type AgencyEvent =
 
 export type AgencyOptions = {
   control?: { assertActive: (agentId: string) => Promise<void> | void };
+  delegations?: {
+    assertAllows: (
+      action: ActionRequestInput,
+    ) => Promise<{ expiresAt?: number }> | { expiresAt?: number };
+  };
   defaultLeaseTtlMs?: number;
   emit?: (event: AgencyEvent) => Promise<void> | void;
   now?: () => number;
