@@ -11,12 +11,14 @@ describe("Agency PostgreSQL adapters", () => {
     const sql = agencyPostgresSchemaSql("agent_state");
     expect(sql).toContain("agent_state.actions");
     expect(sql).toContain("handoff_nonces");
-    expect(() => agencyPostgresSchemaSql("public; DROP TABLE users"))
-      .toThrow("simple identifier");
+    expect(() => agencyPostgresSchemaSql("public; DROP TABLE users")).toThrow(
+      "simple identifier",
+    );
   });
 
   test("consumes execution leases with one conditional UPDATE", async () => {
-    const calls: Array<{ parameters?: ReadonlyArray<unknown>; sql: string }> = [];
+    const calls: Array<{ parameters?: ReadonlyArray<unknown>; sql: string }> =
+      [];
     const client: AgencySqlClient = {
       query: async (sql, parameters) => {
         calls.push({ parameters, sql });

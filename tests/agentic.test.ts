@@ -9,8 +9,10 @@ import {
   createMemoryAgencyStore,
   createMemoryHandoffReplayStore,
   signAgentHandoff,
+  signAgentHandoffWith,
   simulateAction,
   verifyAgentHandoff,
+  verifyAgentHandoffWith,
   type AgentHandoffClaims,
 } from "../src";
 
@@ -209,5 +211,47 @@ describe("signed agent handoffs", () => {
         },
       ),
     ).toThrow("spend");
+  });
+
+  test("supports asymmetric non-exportable signer and verifier providers", async () => {
+    const keys = await crypto.subtle.generateKey(
+      { name: "ECDSA", namedCurve: "P-256" },
+      false,
+      ["sign", "verify"],
+    );
+    const handoff = await signAgentHandoffWith({
+      claims: { ...claims, nonce: "asymmetric-nonce" },
+      signer: {
+        algorithm: "ES256",
+        keyId: "kms-key-version-7",
+        sign: async (payload) =>
+          new Uint8Array(
+            await crypto.subtle.sign(
+              { hash: "SHA-256", name: "ECDSA" },
+              keys.privateKey,
+              Uint8Array.from(payload).buffer,
+            ),
+          ),
+      },
+    });
+    expect(handoff.algorithm).toBe("ES256");
+    const verified = await verifyAgentHandoffWith({
+      expectedAudience: "agent-b",
+      handoff,
+      now: () => 100,
+      replayStore: createMemoryHandoffReplayStore(() => 100),
+      verifier: {
+        verify: async ({ algorithm, keyId, payload, signature }) =>
+          algorithm === "ES256" &&
+          keyId === "kms-key-version-7" &&
+          (await crypto.subtle.verify(
+            { hash: "SHA-256", name: "ECDSA" },
+            keys.publicKey,
+            Uint8Array.from(signature).buffer,
+            Uint8Array.from(payload).buffer,
+          )),
+      },
+    });
+    expect(verified.handoffId).toBe("handoff-1");
   });
 });

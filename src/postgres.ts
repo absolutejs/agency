@@ -77,7 +77,9 @@ export const createPostgresAgencyStore = ({
   const one = async <Value>(sql: string, parameters: ReadonlyArray<unknown>) =>
     (await client.query<DataRow<Value>>(sql, parameters)).rows[0]?.data;
   const many = async <Value>(sql: string, parameters: ReadonlyArray<unknown>) =>
-    (await client.query<DataRow<Value>>(sql, parameters)).rows.map(({ data }) => data);
+    (await client.query<DataRow<Value>>(sql, parameters)).rows.map(
+      ({ data }) => data,
+    );
   const actorFor = async (actionId: string) => {
     const row = await client.query<{ actor_id: string }>(
       `SELECT actor_id FROM ${ns}.actions WHERE action_id = $1`,
@@ -95,9 +97,12 @@ export const createPostgresAgencyStore = ({
           [leaseId, consumedAt],
         )
       ).rowCount === 1,
-    getAction: (id) => one(`SELECT data FROM ${ns}.actions WHERE action_id = $1`, [id]),
-    getApproval: (id) => one(`SELECT data FROM ${ns}.approvals WHERE action_id = $1`, [id]),
-    getLease: (id) => one(`SELECT data FROM ${ns}.leases WHERE lease_id = $1`, [id]),
+    getAction: (id) =>
+      one(`SELECT data FROM ${ns}.actions WHERE action_id = $1`, [id]),
+    getApproval: (id) =>
+      one(`SELECT data FROM ${ns}.approvals WHERE action_id = $1`, [id]),
+    getLease: (id) =>
+      one(`SELECT data FROM ${ns}.leases WHERE lease_id = $1`, [id]),
     listActions: (actorId) =>
       many(
         `SELECT data FROM ${ns}.actions WHERE ($1::text IS NULL OR actor_id = $1) ORDER BY created_at DESC`,
@@ -121,25 +126,48 @@ export const createPostgresAgencyStore = ({
     saveAction: async (action) => {
       await client.query(
         `INSERT INTO ${ns}.actions (action_id, actor_id, created_at, data) VALUES ($1, $2, $3, $4::jsonb) ON CONFLICT (action_id) DO UPDATE SET data = EXCLUDED.data`,
-        [action.actionId, action.actor.agentId, action.createdAt, JSON.stringify(action)],
+        [
+          action.actionId,
+          action.actor.agentId,
+          action.createdAt,
+          JSON.stringify(action),
+        ],
       );
     },
     saveApproval: async (approval) => {
       await client.query(
         `INSERT INTO ${ns}.approvals (action_id, actor_id, approved_at, data) VALUES ($1, $2, $3, $4::jsonb) ON CONFLICT (action_id) DO UPDATE SET approved_at = EXCLUDED.approved_at, data = EXCLUDED.data`,
-        [approval.actionId, await actorFor(approval.actionId), approval.approvedAt, JSON.stringify(approval)],
+        [
+          approval.actionId,
+          await actorFor(approval.actionId),
+          approval.approvedAt,
+          JSON.stringify(approval),
+        ],
       );
     },
     saveLease: async (lease) => {
       await client.query(
         `INSERT INTO ${ns}.leases (lease_id, action_id, actor_id, issued_at, consumed_at, data) VALUES ($1, $2, $3, $4, $5, $6::jsonb) ON CONFLICT (lease_id) DO NOTHING`,
-        [lease.leaseId, lease.actionId, await actorFor(lease.actionId), lease.issuedAt, lease.consumedAt ?? null, JSON.stringify(lease)],
+        [
+          lease.leaseId,
+          lease.actionId,
+          await actorFor(lease.actionId),
+          lease.issuedAt,
+          lease.consumedAt ?? null,
+          JSON.stringify(lease),
+        ],
       );
     },
     saveReceipt: async (receipt) => {
       await client.query(
         `INSERT INTO ${ns}.receipts (receipt_id, action_id, actor_id, completed_at, data) VALUES ($1, $2, $3, $4, $5::jsonb) ON CONFLICT (receipt_id) DO NOTHING`,
-        [receipt.receiptId, receipt.actionId, await actorFor(receipt.actionId), receipt.completedAt, JSON.stringify(receipt)],
+        [
+          receipt.receiptId,
+          receipt.actionId,
+          await actorFor(receipt.actionId),
+          receipt.completedAt,
+          JSON.stringify(receipt),
+        ],
       );
     },
   };
@@ -155,7 +183,10 @@ export const createPostgresAgentControlStore = ({
   const ns = namespaceOf(namespace);
   return {
     clearKillSwitch: async (agentId) => {
-      await client.query(`DELETE FROM ${ns}.kill_switches WHERE agent_id = $1`, [agentId]);
+      await client.query(
+        `DELETE FROM ${ns}.kill_switches WHERE agent_id = $1`,
+        [agentId],
+      );
     },
     getKillSwitch: async (agentId) =>
       (
@@ -167,7 +198,11 @@ export const createPostgresAgentControlStore = ({
     setKillSwitch: async (killSwitch) => {
       await client.query(
         `INSERT INTO ${ns}.kill_switches (agent_id, activated_at, data) VALUES ($1, $2, $3::jsonb) ON CONFLICT (agent_id) DO UPDATE SET activated_at = EXCLUDED.activated_at, data = EXCLUDED.data`,
-        [killSwitch.agentId, killSwitch.activatedAt, JSON.stringify(killSwitch)],
+        [
+          killSwitch.agentId,
+          killSwitch.activatedAt,
+          JSON.stringify(killSwitch),
+        ],
       );
     },
   };

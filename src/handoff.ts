@@ -20,21 +20,53 @@ export type AgentHandoffClaims = {
 };
 
 export type SignedAgentHandoff = {
-  algorithm: "HS256";
+  algorithm: string;
   claims: AgentHandoffClaims;
   keyId: string;
   signature: string;
+};
+
+/** KMS/HSM-ready signing seam. Providers receive canonical bytes and return
+ * raw signature bytes; private key material never needs to enter Agency. */
+export type HandoffSigner = {
+  algorithm: string;
+  keyId: string;
+  sign: (payload: Uint8Array) => Promise<Uint8Array>;
+};
+
+/** Verification is independently resolved so services can use a public JWKS,
+ * trust store, or KMS verify API without sharing the signing provider. */
+export type HandoffVerifier = {
+  verify: (input: {
+    algorithm: string;
+    keyId: string;
+    payload: Uint8Array;
+    signature: Uint8Array;
+  }) => Promise<boolean>;
 };
 
 export type HandoffReplayStore = {
   consume: (nonce: string, expiresAt: number) => Promise<boolean>;
 };
 
-const encode = (value: ArrayBuffer) =>
-  btoa(String.fromCharCode(...new Uint8Array(value)))
+const encode = (value: ArrayBuffer | Uint8Array) =>
+  btoa(
+    String.fromCharCode(
+      ...(value instanceof Uint8Array ? value : new Uint8Array(value)),
+    ),
+  )
     .replaceAll("+", "-")
     .replaceAll("/", "_")
     .replace(/=+$/, "");
+
+const decode = (value: string) => {
+  const padded = value.replaceAll("-", "+").replaceAll("_", "/");
+  const raw = atob(padded + "=".repeat((4 - (padded.length % 4)) % 4));
+  return Uint8Array.from(raw, (character) => character.charCodeAt(0));
+};
+
+const payloadFor = (claims: AgentHandoffClaims, keyId: string) =>
+  new TextEncoder().encode(canonicalJson({ claims, keyId }));
 
 const keyBytes = (key: string | Uint8Array) =>
   typeof key === "string" ? new TextEncoder().encode(key) : key;
@@ -61,12 +93,65 @@ const sign = async (
     ["sign"],
   );
   return encode(
-    await crypto.subtle.sign(
-      "HMAC",
-      cryptoKey,
-      new TextEncoder().encode(canonicalJson({ claims, keyId })),
-    ),
+    await crypto.subtle.sign("HMAC", cryptoKey, payloadFor(claims, keyId)),
   );
+};
+
+export const signAgentHandoffWith = async ({
+  claims,
+  signer,
+}: {
+  claims: Omit<AgentHandoffClaims, "version">;
+  signer: HandoffSigner;
+}): Promise<SignedAgentHandoff> => {
+  const versioned: AgentHandoffClaims = {
+    ...claims,
+    version: "absolute.agent-handoff/1",
+  };
+  const signature = await signer.sign(payloadFor(versioned, signer.keyId));
+  return {
+    algorithm: signer.algorithm,
+    claims: versioned,
+    keyId: signer.keyId,
+    signature: encode(signature),
+  };
+};
+
+export const verifyAgentHandoffWith = async ({
+  expectedAudience,
+  handoff,
+  now = Date.now,
+  replayStore,
+  verifier,
+}: {
+  expectedAudience: string;
+  handoff: SignedAgentHandoff;
+  now?: () => number;
+  replayStore: HandoffReplayStore;
+  verifier: HandoffVerifier;
+}) => {
+  if (handoff.claims.version !== "absolute.agent-handoff/1")
+    throw new Error("Unsupported handoff version");
+  if (handoff.claims.audience !== expectedAudience)
+    throw new Error("Agent handoff audience mismatch");
+  if (handoff.claims.expiresAt <= now())
+    throw new Error("Agent handoff has expired");
+  if (
+    !(await verifier.verify({
+      algorithm: handoff.algorithm,
+      keyId: handoff.keyId,
+      payload: payloadFor(handoff.claims, handoff.keyId),
+      signature: decode(handoff.signature),
+    }))
+  ) {
+    throw new Error("Invalid agent handoff signature");
+  }
+  if (
+    !(await replayStore.consume(handoff.claims.nonce, handoff.claims.expiresAt))
+  ) {
+    throw new Error("Agent handoff has already been consumed");
+  }
+  return structuredClone(handoff.claims);
 };
 
 export const signAgentHandoff = async ({

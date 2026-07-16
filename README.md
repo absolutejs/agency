@@ -58,6 +58,11 @@ then fail closed while the agent is disabled.
   expiring, replay-protected agent-to-agent capability envelopes. Use
   `attenuateAgentHandoff()` for additional hops so scopes, spend, expiry, and
   user identity cannot escalate.
+- `signAgentHandoffWith()` / `verifyAgentHandoffWith()` accept independent
+  signer and verifier providers over canonical bytes. Cloud KMS/HSM adapters
+  can keep private keys non-exportable, rotate by `keyId`, and reject algorithms
+  without changing the handoff wire contract. HS256 remains available for
+  compatibility and local development.
 - `simulateAction()` evaluates policy and produces the same canonical binding
   without storing an action, issuing a lease, or running an effect.
 - `createAgencyTelemetryEmitter()` maps every Agency event to stable

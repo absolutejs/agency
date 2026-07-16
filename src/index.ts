@@ -15,9 +15,13 @@ export {
   attenuateAgentHandoff,
   createMemoryHandoffReplayStore,
   signAgentHandoff,
+  signAgentHandoffWith,
   verifyAgentHandoff,
+  verifyAgentHandoffWith,
   type AgentHandoffClaims,
   type HandoffReplayStore,
+  type HandoffSigner,
+  type HandoffVerifier,
   type SignedAgentHandoff,
 } from "./handoff";
 export { simulateAction } from "./simulation";
