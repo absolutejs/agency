@@ -6,6 +6,23 @@ const tool = toolFactory<Agency>();
 
 export const manifest = defineManifest<AgencyOptions, Agency>()({
   contract: 2,
+  discovery: {
+    audiences: ["agent-hosts", "security-teams"],
+    intents: [
+      "authorize agent actions",
+      "approve exact agent inputs",
+      "audit agent effects",
+    ],
+    keywords: [
+      "agents",
+      "authorization",
+      "approvals",
+      "leases",
+      "delegation",
+      "receipts",
+    ],
+    protocols: ["AuthZEN", "ID-JAG"],
+  },
   identity: {
     accent: "#7c3aed",
     category: "auth",
