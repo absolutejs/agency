@@ -124,7 +124,8 @@ export type AgencyStore = {
   listLeases: (actorId?: string) => Promise<ReadonlyArray<ExecutionLease>>;
   listReceipts: (actorId?: string) => Promise<ReadonlyArray<ActionReceipt>>;
   saveAction: (action: ActionRequest) => Promise<void>;
-  saveApproval: (approval: ActionApproval) => Promise<void>;
+  /** Atomically stores the first approval for an action. */
+  saveApproval: (approval: ActionApproval) => Promise<boolean>;
   saveLease: (lease: ExecutionLease) => Promise<void>;
   saveReceipt: (receipt: ActionReceipt) => Promise<void>;
 };

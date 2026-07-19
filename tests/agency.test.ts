@@ -76,6 +76,33 @@ describe("agency enforcement", () => {
     expect((await agency.issueLease(action.actionId)).maximumUses).toBe(1);
   });
 
+  test("allows only one concurrent approval decision", async () => {
+    const agency = createAgency({
+      policy: allowAllPolicy(),
+      store: createMemoryAgencyStore(),
+    });
+    const { action } = await agency.request(input);
+    const decisions = await Promise.allSettled([
+      agency.approve({
+        actionId: action.actionId,
+        approvedBy: "operator-1",
+        approvedUntil: Date.now() + 60_000,
+      }),
+      agency.approve({
+        actionId: action.actionId,
+        approvedBy: "operator-2",
+        approvedUntil: Date.now() + 60_000,
+      }),
+    ]);
+
+    expect(decisions.filter(({ status }) => status === "fulfilled")).toHaveLength(
+      1,
+    );
+    expect(decisions.filter(({ status }) => status === "rejected")).toHaveLength(
+      1,
+    );
+  });
+
   test("records failed executions while consuming the lease", async () => {
     const agency = createAgency({
       policy: allowAllPolicy(),

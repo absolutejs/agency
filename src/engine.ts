@@ -87,7 +87,8 @@ export const createAgency = ({
       conditions,
       state,
     };
-    await store.saveApproval(approval);
+    if (!(await store.saveApproval(approval)))
+      throw new Error("Action approval has already been decided");
     await emit?.({ actionId, approval, type: "action.approved" });
 
     return approval;

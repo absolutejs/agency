@@ -72,7 +72,10 @@ export const createMemoryAgencyStore = (): AgencyStore => {
       actions.set(action.actionId, clone(action));
     },
     saveApproval: async (approval) => {
+      if (approvals.has(approval.actionId)) return false;
       approvals.set(approval.actionId, clone(approval));
+
+      return true;
     },
     saveLease: async (lease) => {
       leases.set(lease.leaseId, clone(lease));

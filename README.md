@@ -121,6 +121,8 @@ Security invariants:
 
 - Approval is bound to the canonical action, actor, resource, effects, input
   digest, spend, and expiry.
+- Approval decisions are first-writer-wins, including across PostgreSQL
+  processes; a later concurrent decision cannot replace the original actor.
 - Policy is re-evaluated after approval and immediately before issuing a lease.
 - Execution leases are short-lived and single-use.
 - A consumed lease remains consumed when provider execution fails.

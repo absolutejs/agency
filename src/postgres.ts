@@ -148,8 +148,8 @@ export const createPostgresAgencyStore = ({
       );
     },
     saveApproval: async (approval) => {
-      await client.query(
-        `INSERT INTO ${ns}.approvals (action_id, actor_id, approved_at, data) VALUES ($1, $2, $3, $4::jsonb) ON CONFLICT (action_id) DO UPDATE SET approved_at = EXCLUDED.approved_at, data = EXCLUDED.data`,
+      const result = await client.query(
+        `INSERT INTO ${ns}.approvals (action_id, actor_id, approved_at, data) VALUES ($1, $2, $3, $4::jsonb) ON CONFLICT (action_id) DO NOTHING`,
         [
           approval.actionId,
           await actorFor(approval.actionId),
@@ -157,6 +157,8 @@ export const createPostgresAgencyStore = ({
           JSON.stringify(approval),
         ],
       );
+
+      return result.rowCount === 1;
     },
     saveLease: async (lease) => {
       await client.query(

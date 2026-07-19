@@ -31,6 +31,36 @@ describe("Agency PostgreSQL adapters", () => {
     expect(calls[0]?.parameters).toEqual(["lease-1", 100]);
   });
 
+  test("stores only the first approval for an action", async () => {
+    const calls: string[] = [];
+    const client: AgencySqlClient = {
+      query: async <Row>(sql: string) => {
+        calls.push(sql);
+        if (sql.startsWith("SELECT actor_id"))
+          return {
+            rowCount: 1,
+            rows: [{ actor_id: "agent-1" }] as Row[],
+          };
+
+        return { rowCount: 1, rows: [] as Row[] };
+      },
+    };
+    const store = createPostgresAgencyStore({ client });
+    expect(
+      await store.saveApproval({
+        actionId: "action-1",
+        approvalId: "approval-1",
+        approvedAt: 100,
+        approvedBy: "operator-1",
+        approvedUntil: 200,
+        bindingDigest: "digest",
+      }),
+    ).toBe(true);
+    expect(calls.find((sql) => sql.startsWith("INSERT INTO"))).toContain(
+      "ON CONFLICT (action_id) DO NOTHING",
+    );
+  });
+
   test("stores only a nonce digest and atomically rejects conflicts", async () => {
     const parameters: unknown[][] = [];
     const client: AgencySqlClient = {
