@@ -44,6 +44,8 @@ export const manifest = defineManifest<AgencyOptions, Agency>()({
     inspect_agent_actions: tool.runtime({
       annotations: { readOnlyHint: true },
       authorization: {
+        approval: "never",
+        audience: "admin",
         effects: ["read"],
         requiredScopes: ["agency:inspect"],
       },
