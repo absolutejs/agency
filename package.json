@@ -1,6 +1,6 @@
 {
   "name": "@absolutejs/agency",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "Provider-agnostic AI agent authorization with policy, approvals, durable delegation, execution leases, receipts, kill switches, and signed handoffs.",
   "type": "module",
   "license": "MIT",
@@ -43,7 +43,7 @@
     "access": "public"
   },
   "scripts": {
-    "build": "rm -rf dist && bun build src/index.ts src/authzen.ts src/manifest.ts --outdir dist --root src --sourcemap --target=bun && tsc --project tsconfig.build.json && absolute-manifest emit",
+    "build": "rm -rf dist && bun build src/index.ts src/authzen.ts src/manifest.ts --outdir dist --root src --sourcemap --target=bun --external drizzle-orm --external 'drizzle-orm/*' && tsc --project tsconfig.build.json && absolute-manifest emit",
     "typecheck": "tsc --noEmit",
     "test": "bun test tests/",
     "format": "prettier --write \"./**/*.{ts,json,md}\"",
@@ -52,7 +52,8 @@
   },
   "dependencies": {
     "@absolutejs/manifest": "^0.3.0",
-    "@sinclair/typebox": "^0.34.0"
+    "@sinclair/typebox": "^0.34.0",
+    "drizzle-orm": "1.0.0-rc.4"
   },
   "devDependencies": {
     "@types/bun": "^1.3.14",

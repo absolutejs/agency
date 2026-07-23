@@ -33,6 +33,13 @@ export {
 } from "./handoff";
 export { simulateAction } from "./simulation";
 export {
+  agencyDrizzleSchema,
+  createDrizzleAgencyStore,
+  createDrizzleAgentControlStore,
+  createDrizzleAgentDelegationStore,
+  createDrizzleHandoffReplayStore,
+} from "./drizzle";
+export {
   agencyPostgresSchemaSql,
   createPostgresAgencyStore,
   createPostgresAgentDelegationStore,
