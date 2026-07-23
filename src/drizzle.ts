@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNull, or } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import {
   bigint,
   customType,
@@ -27,6 +27,8 @@ const portableJsonb = customType<{ data: unknown; driverData: unknown }>({
     typeof value === "string" ? JSON.parse(value) : value,
   toDriver: (value) => JSON.stringify(value),
 });
+const encodedJsonb = <Value>(value: Value) =>
+  sql<Value>`${JSON.stringify(value)}::text::jsonb`;
 
 const namespaceOf = (namespace: string) => {
   if (!/^[a-z_][a-z0-9_]*$/.test(namespace))
@@ -157,7 +159,10 @@ export const createDrizzleAgencyStore = <DB extends AnyPgDatabase>(
         if (!row) return false;
         const updated = await transaction
           .update(leases)
-          .set({ consumed_at: consumedAt, data: { ...row.data, consumedAt } })
+          .set({
+            consumed_at: consumedAt,
+            data: encodedJsonb({ ...row.data, consumedAt }),
+          })
           .where(and(eq(leases.lease_id, leaseId), isNull(leases.consumed_at)))
           .returning({ id: leases.lease_id });
         return updated.length === 1;
@@ -225,10 +230,10 @@ export const createDrizzleAgencyStore = <DB extends AnyPgDatabase>(
           action_id: action.actionId,
           actor_id: action.actor.agentId,
           created_at: action.createdAt,
-          data: action,
+          data: encodedJsonb(action),
         })
         .onConflictDoUpdate({
-          set: { data: action },
+          set: { data: encodedJsonb(action) },
           target: actions.action_id,
         });
     },
@@ -240,7 +245,7 @@ export const createDrizzleAgencyStore = <DB extends AnyPgDatabase>(
             action_id: approval.actionId,
             actor_id: await actorFor(approval.actionId),
             approved_at: approval.approvedAt,
-            data: approval,
+            data: encodedJsonb(approval),
           })
           .onConflictDoNothing()
           .returning({ id: approvals.action_id })
@@ -252,7 +257,7 @@ export const createDrizzleAgencyStore = <DB extends AnyPgDatabase>(
           action_id: lease.actionId,
           actor_id: await actorFor(lease.actionId),
           consumed_at: lease.consumedAt ?? null,
-          data: lease,
+          data: encodedJsonb(lease),
           issued_at: lease.issuedAt,
           lease_id: lease.leaseId,
         })
@@ -265,7 +270,7 @@ export const createDrizzleAgencyStore = <DB extends AnyPgDatabase>(
           action_id: receipt.actionId,
           actor_id: await actorFor(receipt.actionId),
           completed_at: receipt.completedAt,
-          data: receipt,
+          data: encodedJsonb(receipt),
           receipt_id: receipt.receiptId,
         })
         .onConflictDoNothing();
@@ -296,12 +301,12 @@ export const createDrizzleAgentControlStore = <DB extends AnyPgDatabase>(
         .values({
           activated_at: killSwitch.activatedAt,
           agent_id: killSwitch.agentId,
-          data: killSwitch,
+          data: encodedJsonb(killSwitch),
         })
         .onConflictDoUpdate({
           set: {
             activated_at: killSwitch.activatedAt,
-            data: killSwitch,
+            data: encodedJsonb(killSwitch),
           },
           target: killSwitches.agent_id,
         });
@@ -394,7 +399,7 @@ export const createDrizzleAgentDelegationStore = <DB extends AnyPgDatabase>(
           await transaction
             .update(delegations)
             .set({
-              data: { ...row.data, revokedAt },
+              data: encodedJsonb({ ...row.data, revokedAt }),
               revoked_at: revokedAt,
             })
             .where(eq(delegations.delegation_id, row.id));
@@ -404,7 +409,7 @@ export const createDrizzleAgentDelegationStore = <DB extends AnyPgDatabase>(
       const rows = await db
         .insert(delegations)
         .values({
-          data: grant,
+          data: encodedJsonb(grant),
           delegation_id: grant.delegationId,
           expires_at: grant.expiresAt,
           issuer_agent_id: grant.issuerAgentId,

@@ -95,12 +95,12 @@ describe("agency enforcement", () => {
       }),
     ]);
 
-    expect(decisions.filter(({ status }) => status === "fulfilled")).toHaveLength(
-      1,
-    );
-    expect(decisions.filter(({ status }) => status === "rejected")).toHaveLength(
-      1,
-    );
+    expect(
+      decisions.filter(({ status }) => status === "fulfilled"),
+    ).toHaveLength(1);
+    expect(
+      decisions.filter(({ status }) => status === "rejected"),
+    ).toHaveLength(1);
   });
 
   test("records failed executions while consuming the lease", async () => {
