@@ -15,6 +15,7 @@ import type { HandoffReplayStore } from "./handoff";
 import type {
   ActionApproval,
   ActionReceipt,
+  ActionRejection,
   ActionRequest,
   AgencyStore,
   ExecutionLease,
@@ -60,6 +61,14 @@ export const agencyDrizzleSchema = (namespace = "agency") => {
     actor_id: text().notNull(),
     approved_at: bigint({ mode: "number" }).notNull(),
     data: portableJsonb().$type<ActionApproval>().notNull(),
+  });
+  const rejections = schema.table("rejections", {
+    action_id: text()
+      .primaryKey()
+      .references(() => actions.action_id, { onDelete: "cascade" }),
+    actor_id: text().notNull(),
+    data: portableJsonb().$type<ActionRejection>().notNull(),
+    rejected_at: bigint({ mode: "number" }).notNull(),
   });
   const leases = schema.table("leases", {
     action_id: text()
@@ -127,6 +136,7 @@ export const agencyDrizzleSchema = (namespace = "agency") => {
     killSwitches,
     leases,
     receipts,
+    rejections,
   };
 };
 
@@ -134,9 +144,8 @@ export const createDrizzleAgencyStore = <DB extends AnyPgDatabase>(
   db: DB,
   options: { namespace?: string } = {},
 ): AgencyStore => {
-  const { actions, approvals, leases, receipts } = agencyDrizzleSchema(
-    options.namespace,
-  );
+  const { actions, approvals, leases, receipts, rejections } =
+    agencyDrizzleSchema(options.namespace);
   const actorFor = async (actionId: string) => {
     const [row] = await db
       .select({ actorId: actions.actor_id })
@@ -191,6 +200,14 @@ export const createDrizzleAgencyStore = <DB extends AnyPgDatabase>(
           .where(eq(leases.lease_id, id))
           .limit(1)
       )[0]?.data,
+    getRejection: async (id) =>
+      (
+        await db
+          .select({ data: rejections.data })
+          .from(rejections)
+          .where(eq(rejections.action_id, id))
+          .limit(1)
+      )[0]?.data,
     listActions: async (actorId) =>
       (
         await db
@@ -223,6 +240,14 @@ export const createDrizzleAgencyStore = <DB extends AnyPgDatabase>(
           .where(actorId ? eq(receipts.actor_id, actorId) : undefined)
           .orderBy(desc(receipts.completed_at))
       ).map(({ data }) => data),
+    listRejections: async (actorId) =>
+      (
+        await db
+          .select({ data: rejections.data })
+          .from(rejections)
+          .where(actorId ? eq(rejections.actor_id, actorId) : undefined)
+          .orderBy(desc(rejections.rejected_at))
+      ).map(({ data }) => data),
     saveAction: async (action) => {
       await db
         .insert(actions)
@@ -237,19 +262,40 @@ export const createDrizzleAgencyStore = <DB extends AnyPgDatabase>(
           target: actions.action_id,
         });
     },
-    saveApproval: async (approval) =>
-      (
-        await db
+    saveApproval: (approval) =>
+      db.transaction(async (transaction) => {
+        const [action] = await transaction
+          .select({ actorId: actions.actor_id })
+          .from(actions)
+          .where(eq(actions.action_id, approval.actionId))
+          .for("update")
+          .limit(1);
+        if (!action) throw new Error("Unknown action");
+        const [existingApproval] = await transaction
+          .select({ id: approvals.action_id })
+          .from(approvals)
+          .where(eq(approvals.action_id, approval.actionId))
+          .limit(1);
+        const [existingRejection] = await transaction
+          .select({ id: rejections.action_id })
+          .from(rejections)
+          .where(eq(rejections.action_id, approval.actionId))
+          .limit(1);
+        if (existingApproval || existingRejection) return false;
+
+        const inserted = await transaction
           .insert(approvals)
           .values({
             action_id: approval.actionId,
-            actor_id: await actorFor(approval.actionId),
+            actor_id: action.actorId,
             approved_at: approval.approvedAt,
             data: encodedJsonb(approval),
           })
           .onConflictDoNothing()
-          .returning({ id: approvals.action_id })
-      ).length === 1,
+          .returning({ id: approvals.action_id });
+
+        return inserted.length === 1;
+      }),
     saveLease: async (lease) => {
       await db
         .insert(leases)
@@ -275,6 +321,40 @@ export const createDrizzleAgencyStore = <DB extends AnyPgDatabase>(
         })
         .onConflictDoNothing();
     },
+    saveRejection: (rejection) =>
+      db.transaction(async (transaction) => {
+        const [action] = await transaction
+          .select({ actorId: actions.actor_id })
+          .from(actions)
+          .where(eq(actions.action_id, rejection.actionId))
+          .for("update")
+          .limit(1);
+        if (!action) throw new Error("Unknown action");
+        const [existingApproval] = await transaction
+          .select({ id: approvals.action_id })
+          .from(approvals)
+          .where(eq(approvals.action_id, rejection.actionId))
+          .limit(1);
+        const [existingRejection] = await transaction
+          .select({ id: rejections.action_id })
+          .from(rejections)
+          .where(eq(rejections.action_id, rejection.actionId))
+          .limit(1);
+        if (existingApproval || existingRejection) return false;
+
+        const inserted = await transaction
+          .insert(rejections)
+          .values({
+            action_id: rejection.actionId,
+            actor_id: action.actorId,
+            data: encodedJsonb(rejection),
+            rejected_at: rejection.rejectedAt,
+          })
+          .onConflictDoNothing()
+          .returning({ id: rejections.action_id });
+
+        return inserted.length === 1;
+      }),
   };
 };
 

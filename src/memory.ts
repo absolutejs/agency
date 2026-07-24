@@ -1,6 +1,7 @@
 import type {
   ActionApproval,
   ActionReceipt,
+  ActionRejection,
   ActionRequest,
   AgencyStore,
   ExecutionLease,
@@ -13,6 +14,7 @@ export const createMemoryAgencyStore = (): AgencyStore => {
   const approvals = new Map<string, ActionApproval>();
   const leases = new Map<string, ExecutionLease>();
   const receipts = new Map<string, ActionReceipt>();
+  const rejections = new Map<string, ActionRejection>();
   const actorForAction = (actionId: string) =>
     actions.get(actionId)?.actor.agentId;
 
@@ -38,6 +40,11 @@ export const createMemoryAgencyStore = (): AgencyStore => {
       const lease = leases.get(leaseId);
 
       return lease === undefined ? undefined : clone(lease);
+    },
+    getRejection: async (actionId) => {
+      const rejection = rejections.get(actionId);
+
+      return rejection === undefined ? undefined : clone(rejection);
     },
     listActions: async (actorId) =>
       [...actions.values()]
@@ -68,11 +75,20 @@ export const createMemoryAgencyStore = (): AgencyStore => {
             actorForAction(receipt.actionId) === actorId,
         )
         .map(clone),
+    listRejections: async (actorId) =>
+      [...rejections.values()]
+        .filter(
+          (rejection) =>
+            actorId === undefined ||
+            actorForAction(rejection.actionId) === actorId,
+        )
+        .map(clone),
     saveAction: async (action) => {
       actions.set(action.actionId, clone(action));
     },
     saveApproval: async (approval) => {
-      if (approvals.has(approval.actionId)) return false;
+      if (approvals.has(approval.actionId) || rejections.has(approval.actionId))
+        return false;
       approvals.set(approval.actionId, clone(approval));
 
       return true;
@@ -82,6 +98,16 @@ export const createMemoryAgencyStore = (): AgencyStore => {
     },
     saveReceipt: async (receipt) => {
       receipts.set(receipt.receiptId, clone(receipt));
+    },
+    saveRejection: async (rejection) => {
+      if (
+        approvals.has(rejection.actionId) ||
+        rejections.has(rejection.actionId)
+      )
+        return false;
+      rejections.set(rejection.actionId, clone(rejection));
+
+      return true;
     },
   };
 };

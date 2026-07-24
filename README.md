@@ -4,8 +4,8 @@ Provider-neutral action authorization for AI agents.
 
 Authentication says which agent is acting and on whose behalf. Agency decides
 whether that exact action may happen now, coordinates prerequisites such as
-human approval, issues a short-lived single-use execution lease, and records a
-receipt after execution.
+human approval or terminal human rejection, issues a short-lived single-use
+execution lease, and records a receipt after execution.
 
 ```ts
 import { createAgency, createMemoryAgencyStore } from "@absolutejs/agency";
@@ -34,6 +34,14 @@ if (decision.kind === "allow") {
     executor: "email-provider",
     leaseId: lease.leaseId,
     run: () => email.send(action.input),
+  });
+}
+
+if (decision.kind === "deny" && decision.requestable) {
+  await agency.reject({
+    actionId: action.actionId,
+    reason: "The recipient is outside the approved customer account.",
+    rejectedBy: "operator-123",
   });
 }
 ```
@@ -102,9 +110,10 @@ nonces.
 ### PostgreSQL production state
 
 `agencyPostgresSchemaSql()` creates indexed tables for actions, approvals,
-leases, receipts, kill switches, and replay nonces. The adapters accept a small
-structural `AgencySqlClient`, so Bun SQL, Neon, `pg`, and transaction-aware host
-clients can be used without coupling the core package to a database driver.
+rejections, leases, receipts, kill switches, and replay nonces. The adapters
+accept a small structural `AgencySqlClient`, so Bun SQL, Neon, `pg`, and
+transaction-aware host clients can be used without coupling the core package to
+a database driver.
 
 ```ts
 const store = createPostgresAgencyStore({ client: sqlClient });
@@ -119,10 +128,12 @@ starting workers.
 
 Security invariants:
 
-- Approval is bound to the canonical action, actor, resource, effects, input
-  digest, spend, and expiry.
-- Approval decisions are first-writer-wins, including across PostgreSQL
-  processes; a later concurrent decision cannot replace the original actor.
+- Approval and rejection are bound to the canonical action, actor, resource,
+  effects, input digest, spend, and expiry.
+- Approval-versus-rejection decisions are first-writer-wins, including across
+  PostgreSQL processes; a later concurrent decision cannot replace the original
+  operator decision.
+- A rejected action can never receive an execution lease.
 - Policy is re-evaluated after approval and immediately before issuing a lease.
 - Execution leases are short-lived and single-use.
 - A consumed lease remains consumed when provider execution fails.

@@ -38,6 +38,12 @@ CREATE TABLE IF NOT EXISTS ${ns}.approvals (
   approved_at bigint NOT NULL,
   data jsonb NOT NULL
 );
+CREATE TABLE IF NOT EXISTS ${ns}.rejections (
+  action_id text PRIMARY KEY REFERENCES ${ns}.actions(action_id) ON DELETE CASCADE,
+  actor_id text NOT NULL,
+  rejected_at bigint NOT NULL,
+  data jsonb NOT NULL
+);
 CREATE TABLE IF NOT EXISTS ${ns}.leases (
   lease_id text PRIMARY KEY,
   action_id text NOT NULL REFERENCES ${ns}.actions(action_id) ON DELETE CASCADE,
@@ -116,6 +122,8 @@ export const createPostgresAgencyStore = ({
       one(`SELECT data FROM ${ns}.approvals WHERE action_id = $1`, [id]),
     getLease: (id) =>
       one(`SELECT data FROM ${ns}.leases WHERE lease_id = $1`, [id]),
+    getRejection: (id) =>
+      one(`SELECT data FROM ${ns}.rejections WHERE action_id = $1`, [id]),
     listActions: (actorId) =>
       many(
         `SELECT data FROM ${ns}.actions WHERE ($1::text IS NULL OR actor_id = $1) ORDER BY created_at DESC`,
@@ -136,6 +144,11 @@ export const createPostgresAgencyStore = ({
         `SELECT data FROM ${ns}.receipts WHERE ($1::text IS NULL OR actor_id = $1) ORDER BY completed_at DESC`,
         [actorId ?? null],
       ),
+    listRejections: (actorId) =>
+      many(
+        `SELECT data FROM ${ns}.rejections WHERE ($1::text IS NULL OR actor_id = $1) ORDER BY rejected_at DESC`,
+        [actorId ?? null],
+      ),
     saveAction: async (action) => {
       await client.query(
         `INSERT INTO ${ns}.actions (action_id, actor_id, created_at, data) VALUES ($1, $2, $3, $4::jsonb) ON CONFLICT (action_id) DO UPDATE SET data = EXCLUDED.data`,
@@ -149,13 +162,17 @@ export const createPostgresAgencyStore = ({
     },
     saveApproval: async (approval) => {
       const result = await client.query(
-        `INSERT INTO ${ns}.approvals (action_id, actor_id, approved_at, data) VALUES ($1, $2, $3, $4::jsonb) ON CONFLICT (action_id) DO NOTHING`,
-        [
-          approval.actionId,
-          await actorFor(approval.actionId),
-          approval.approvedAt,
-          JSON.stringify(approval),
-        ],
+        `WITH locked AS (
+          SELECT actor_id FROM ${ns}.actions WHERE action_id = $1 FOR UPDATE
+        ), available AS (
+          SELECT actor_id FROM locked
+          WHERE NOT EXISTS (SELECT 1 FROM ${ns}.approvals WHERE action_id = $1)
+            AND NOT EXISTS (SELECT 1 FROM ${ns}.rejections WHERE action_id = $1)
+        )
+        INSERT INTO ${ns}.approvals (action_id, actor_id, approved_at, data)
+        SELECT $1, actor_id, $2, $3::jsonb FROM available
+        ON CONFLICT (action_id) DO NOTHING`,
+        [approval.actionId, approval.approvedAt, JSON.stringify(approval)],
       );
 
       return result.rowCount === 1;
@@ -184,6 +201,23 @@ export const createPostgresAgencyStore = ({
           JSON.stringify(receipt),
         ],
       );
+    },
+    saveRejection: async (rejection) => {
+      const result = await client.query(
+        `WITH locked AS (
+          SELECT actor_id FROM ${ns}.actions WHERE action_id = $1 FOR UPDATE
+        ), available AS (
+          SELECT actor_id FROM locked
+          WHERE NOT EXISTS (SELECT 1 FROM ${ns}.approvals WHERE action_id = $1)
+            AND NOT EXISTS (SELECT 1 FROM ${ns}.rejections WHERE action_id = $1)
+        )
+        INSERT INTO ${ns}.rejections (action_id, actor_id, rejected_at, data)
+        SELECT $1, actor_id, $2, $3::jsonb FROM available
+        ON CONFLICT (action_id) DO NOTHING`,
+        [rejection.actionId, rejection.rejectedAt, JSON.stringify(rejection)],
+      );
+
+      return result.rowCount === 1;
     },
   };
 };

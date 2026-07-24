@@ -103,6 +103,61 @@ describe("agency enforcement", () => {
     ).toHaveLength(1);
   });
 
+  test("makes approval versus rejection terminal and first-writer-wins", async () => {
+    const agency = createAgency({
+      policy: allowAllPolicy(),
+      store: createMemoryAgencyStore(),
+    });
+    const { action } = await agency.request(input);
+    const decisions = await Promise.allSettled([
+      agency.approve({
+        actionId: action.actionId,
+        approvedBy: "operator-1",
+        approvedUntil: Date.now() + 60_000,
+      }),
+      agency.reject({
+        actionId: action.actionId,
+        reason: "Recipient is outside the approved account.",
+        rejectedBy: "operator-2",
+      }),
+    ]);
+
+    expect(
+      decisions.filter(({ status }) => status === "fulfilled"),
+    ).toHaveLength(1);
+    expect(
+      decisions.filter(({ status }) => status === "rejected"),
+    ).toHaveLength(1);
+    const state = await agency.inspect("agent-1");
+    expect(state.approvals.length + state.rejections.length).toBe(1);
+  });
+
+  test("binds a terminal rejection and never issues an execution lease", async () => {
+    const agency = createAgency({
+      policy: allowAllPolicy(),
+      store: createMemoryAgencyStore(),
+    });
+    const { action } = await agency.request(input);
+    const rejection = await agency.reject({
+      actionId: action.actionId,
+      reason: "The requested effect is unsafe.",
+      rejectedBy: "operator-1",
+    });
+
+    expect(rejection.bindingDigest).toHaveLength(64);
+    await expect(agency.issueLease(action.actionId)).rejects.toThrow(
+      "Action rejected: The requested effect is unsafe.",
+    );
+    await expect(
+      agency.approve({
+        actionId: action.actionId,
+        approvedBy: "operator-2",
+        approvedUntil: Date.now() + 60_000,
+      }),
+    ).rejects.toThrow("already been decided");
+    expect((await agency.inspect("agent-1")).rejections).toEqual([rejection]);
+  });
+
   test("records failed executions while consuming the lease", async () => {
     const agency = createAgency({
       policy: allowAllPolicy(),

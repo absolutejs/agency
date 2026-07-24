@@ -58,6 +58,7 @@ export type {
   ActionDecision,
   ActionEffect,
   ActionReceipt,
+  ActionRejection,
   ActionRequest,
   ActionRequestInput,
   AgencyEvent,

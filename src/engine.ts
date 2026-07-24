@@ -1,6 +1,7 @@
 import { actionBinding, digest } from "./canonical";
 import type {
   ActionApproval,
+  ActionRejection,
   ActionReceipt,
   ActionRequest,
   ActionRequestInput,
@@ -74,6 +75,8 @@ export const createAgency = ({
     state?: unknown;
   }) => {
     const action = required(await store.getAction(actionId), "Unknown action");
+    if ((await store.getRejection(actionId)) !== undefined)
+      throw new Error("Action has already been decided");
     const approvedAt = now();
     if (approvedUntil <= approvedAt)
       throw new Error("Approval must expire in the future");
@@ -88,14 +91,49 @@ export const createAgency = ({
       state,
     };
     if (!(await store.saveApproval(approval)))
-      throw new Error("Action approval has already been decided");
+      throw new Error("Action has already been decided");
     await emit?.({ actionId, approval, type: "action.approved" });
 
     return approval;
   };
 
+  const reject = async ({
+    actionId,
+    reason,
+    rejectedBy,
+    state,
+  }: {
+    actionId: string;
+    reason: string;
+    rejectedBy: string;
+    state?: unknown;
+  }) => {
+    const action = required(await store.getAction(actionId), "Unknown action");
+    if (reason.trim() === "") throw new Error("Rejection reason is required");
+    const rejection: ActionRejection = {
+      actionId,
+      bindingDigest: await actionBinding(action),
+      reason: reason.trim(),
+      rejectedAt: now(),
+      rejectedBy,
+      rejectionId: `rej_${crypto.randomUUID()}`,
+      state,
+    };
+    if (!(await store.saveRejection(rejection)))
+      throw new Error("Action has already been decided");
+    await emit?.({ actionId, rejection, type: "action.rejected" });
+
+    return rejection;
+  };
+
   const issueLease = async (actionId: string) => {
     const action = required(await store.getAction(actionId), "Unknown action");
+    const rejection = await store.getRejection(actionId);
+    if (rejection !== undefined) {
+      if (rejection.bindingDigest !== (await actionBinding(action)))
+        throw new Error("Rejection is not bound to the current action");
+      throw new Error(`Action rejected: ${rejection.reason}`);
+    }
     await control?.assertActive(action.actor.agentId);
     const delegation = await delegations?.assertAllows(action);
     const approval = await store.getApproval(actionId);
@@ -214,9 +252,10 @@ export const createAgency = ({
     approvals: await store.listApprovals(actorId),
     leases: await store.listLeases(actorId),
     receipts: await store.listReceipts(actorId),
+    rejections: await store.listRejections(actorId),
   });
 
-  return { approve, execute, inspect, issueLease, request };
+  return { approve, execute, inspect, issueLease, reject, request };
 };
 
 export type Agency = ReturnType<typeof createAgency>;

@@ -79,6 +79,16 @@ export type ActionApproval = {
   state?: unknown;
 };
 
+export type ActionRejection = {
+  actionId: string;
+  bindingDigest: string;
+  reason: string;
+  rejectedAt: number;
+  rejectedBy: string;
+  rejectionId: string;
+  state?: unknown;
+};
+
 export type ExecutionLease = {
   actionId: string;
   bindingDigest: string;
@@ -118,16 +128,20 @@ export type AgencyStore = {
   consumeLease: (leaseId: string, consumedAt: number) => Promise<boolean>;
   getAction: (actionId: string) => Promise<ActionRequest | undefined>;
   getApproval: (actionId: string) => Promise<ActionApproval | undefined>;
+  getRejection: (actionId: string) => Promise<ActionRejection | undefined>;
   getLease: (leaseId: string) => Promise<ExecutionLease | undefined>;
   listActions: (actorId?: string) => Promise<ReadonlyArray<ActionRequest>>;
   listApprovals: (actorId?: string) => Promise<ReadonlyArray<ActionApproval>>;
   listLeases: (actorId?: string) => Promise<ReadonlyArray<ExecutionLease>>;
   listReceipts: (actorId?: string) => Promise<ReadonlyArray<ActionReceipt>>;
+  listRejections: (actorId?: string) => Promise<ReadonlyArray<ActionRejection>>;
   saveAction: (action: ActionRequest) => Promise<void>;
-  /** Atomically stores the first approval for an action. */
+  /** Atomically stores the first approval or rejection for an action. */
   saveApproval: (approval: ActionApproval) => Promise<boolean>;
   saveLease: (lease: ExecutionLease) => Promise<void>;
   saveReceipt: (receipt: ActionReceipt) => Promise<void>;
+  /** Atomically stores the first approval or rejection for an action. */
+  saveRejection: (rejection: ActionRejection) => Promise<boolean>;
 };
 
 export type AgencyEvent =
@@ -135,7 +149,8 @@ export type AgencyEvent =
   | { actionId: string; approval: ActionApproval; type: "action.approved" }
   | { actionId: string; decision: ActionDecision; type: "action.decided" }
   | { actionId: string; lease: ExecutionLease; type: "action.lease-issued" }
-  | { actionId: string; receipt: ActionReceipt; type: "action.completed" };
+  | { actionId: string; receipt: ActionReceipt; type: "action.completed" }
+  | { actionId: string; rejection: ActionRejection; type: "action.rejected" };
 
 export type AgencyOptions = {
   control?: { assertActive: (agentId: string) => Promise<void> | void };

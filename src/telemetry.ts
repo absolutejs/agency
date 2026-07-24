@@ -30,6 +30,9 @@ export const agencyEventToTelemetry = (
   } else if (event.type === "action.completed") {
     attributes["agent.receipt.id"] = event.receipt.receiptId;
     attributes["agent.execution.status"] = event.receipt.status;
+  } else if (event.type === "action.rejected") {
+    attributes["agent.rejection.id"] = event.rejection.rejectionId;
+    attributes["agent.rejection.by"] = event.rejection.rejectedBy;
   } else {
     attributes["agent.approval.id"] = event.approval.approvalId;
     attributes["agent.approval.by"] = event.approval.approvedBy;

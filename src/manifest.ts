@@ -11,12 +11,14 @@ export const manifest = defineManifest<AgencyOptions, Agency>()({
     intents: [
       "authorize agent actions",
       "approve exact agent inputs",
+      "reject unsafe agent actions",
       "audit agent effects",
     ],
     keywords: [
       "agents",
       "authorization",
       "approvals",
+      "rejections",
       "leases",
       "delegation",
       "receipts",
@@ -27,7 +29,7 @@ export const manifest = defineManifest<AgencyOptions, Agency>()({
     accent: "#7c3aed",
     category: "auth",
     description:
-      "Provider-neutral action authorization for AI agents, including exact-input approval binding, recursively attenuated durable delegation, policy re-evaluation, single-use execution leases, KMS/HSM-ready signed handoffs, simulation, kill switches, and immutable receipts.",
+      "Provider-neutral action authorization for AI agents, including exact-input approval and rejection binding, recursively attenuated durable delegation, policy re-evaluation, single-use execution leases, KMS/HSM-ready signed handoffs, simulation, kill switches, and immutable receipts.",
     docsUrl: "https://github.com/absolutejs/agency",
     name: "@absolutejs/agency",
     tagline: "Control and audit what AI agents may do.",
@@ -50,7 +52,7 @@ export const manifest = defineManifest<AgencyOptions, Agency>()({
         requiredScopes: ["agency:inspect"],
       },
       description:
-        "Inspect an agent action ledger including requests, approvals, execution leases, and receipts.",
+        "Inspect an agent action ledger including requests, approvals, rejections, execution leases, and receipts.",
       handler: async ({ agentId }, agency) =>
         JSON.stringify(await agency.inspect(agentId)),
       input: Type.Object({

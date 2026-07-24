@@ -11,6 +11,7 @@ describe("Agency PostgreSQL adapters", () => {
     const sql = agencyPostgresSchemaSql("agent_state");
     expect(sql).toContain("agent_state.actions");
     expect(sql).toContain("handoff_nonces");
+    expect(sql).toContain("agent_state.rejections");
     expect(() => agencyPostgresSchemaSql("public; DROP TABLE users")).toThrow(
       "simple identifier",
     );
@@ -31,17 +32,11 @@ describe("Agency PostgreSQL adapters", () => {
     expect(calls[0]?.parameters).toEqual(["lease-1", 100]);
   });
 
-  test("stores only the first approval for an action", async () => {
+  test("stores approval and rejection through one terminal decision lock", async () => {
     const calls: string[] = [];
     const client: AgencySqlClient = {
       query: async <Row>(sql: string) => {
         calls.push(sql);
-        if (sql.startsWith("SELECT actor_id"))
-          return {
-            rowCount: 1,
-            rows: [{ actor_id: "agent-1" }] as Row[],
-          };
-
         return { rowCount: 1, rows: [] as Row[] };
       },
     };
@@ -56,8 +51,23 @@ describe("Agency PostgreSQL adapters", () => {
         bindingDigest: "digest",
       }),
     ).toBe(true);
-    expect(calls.find((sql) => sql.startsWith("INSERT INTO"))).toContain(
-      "ON CONFLICT (action_id) DO NOTHING",
+    expect(calls[0]).toContain(
+      "SELECT actor_id FROM agency.actions WHERE action_id = $1 FOR UPDATE",
+    );
+    expect(calls[0]).toContain("NOT EXISTS");
+
+    expect(
+      await store.saveRejection({
+        actionId: "action-2",
+        bindingDigest: "digest",
+        reason: "Unsafe target",
+        rejectedAt: 101,
+        rejectedBy: "operator-2",
+        rejectionId: "rejection-1",
+      }),
+    ).toBe(true);
+    expect(calls[1]).toContain(
+      "INSERT INTO agency.rejections (action_id, actor_id, rejected_at, data)",
     );
   });
 
