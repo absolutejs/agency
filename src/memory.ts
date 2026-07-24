@@ -84,7 +84,8 @@ export const createMemoryAgencyStore = (): AgencyStore => {
         )
         .map(clone),
     saveAction: async (action) => {
-      actions.set(action.actionId, clone(action));
+      if (!actions.has(action.actionId))
+        actions.set(action.actionId, clone(action));
     },
     saveApproval: async (approval) => {
       if (approvals.has(approval.actionId) || rejections.has(approval.actionId))

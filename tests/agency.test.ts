@@ -20,6 +20,46 @@ const input = {
 };
 
 describe("agency enforcement", () => {
+  test("reuses an idempotent request and identical approval", async () => {
+    const agency = createAgency({
+      policy: allowAllPolicy(),
+      store: createMemoryAgencyStore(),
+    });
+    const keyedInput = { ...input, idempotencyKey: "send-message-1" };
+    const first = await agency.request(keyedInput);
+    const second = await agency.request(keyedInput);
+    expect(second.action).toEqual(first.action);
+
+    const approved = await agency.approve({
+      actionId: first.action.actionId,
+      approvedBy: "user-1",
+      approvedUntil: Date.now() + 60_000,
+      conditions: { source: "member" },
+    });
+    const retried = await agency.approve({
+      actionId: first.action.actionId,
+      approvedBy: "user-1",
+      approvedUntil: Date.now() + 120_000,
+      conditions: { source: "member" },
+    });
+    expect(retried).toEqual(approved);
+  });
+
+  test("rejects reuse of an idempotency key for a different action", async () => {
+    const agency = createAgency({
+      policy: allowAllPolicy(),
+      store: createMemoryAgencyStore(),
+    });
+    await agency.request({ ...input, idempotencyKey: "send-message-1" });
+    await expect(
+      agency.request({
+        ...input,
+        idempotencyKey: "send-message-1",
+        input: { body: "different", recipient: "person@example.com" },
+      }),
+    ).rejects.toThrow("Idempotency key was already used");
+  });
+
   test("issues a single-use lease and records a receipt", async () => {
     const store = createMemoryAgencyStore();
     const agency = createAgency({ policy: allowAllPolicy(), store });

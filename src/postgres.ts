@@ -171,7 +171,7 @@ export const createPostgresAgencyStore = ({
       ),
     saveAction: async (action) => {
       await client.query(
-        `INSERT INTO ${ns}.actions (action_id, actor_id, created_at, data) VALUES ($1, $2, $3, $4::jsonb) ON CONFLICT (action_id) DO UPDATE SET data = EXCLUDED.data`,
+        `INSERT INTO ${ns}.actions (action_id, actor_id, created_at, data) VALUES ($1, $2, $3, $4::jsonb) ON CONFLICT (action_id) DO NOTHING`,
         [
           action.actionId,
           action.actor.agentId,

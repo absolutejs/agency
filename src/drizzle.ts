@@ -257,10 +257,7 @@ export const createDrizzleAgencyStore = <DB extends AnyPgDatabase>(
           created_at: action.createdAt,
           data: encodedJsonb(action),
         })
-        .onConflictDoUpdate({
-          set: { data: encodedJsonb(action) },
-          target: actions.action_id,
-        });
+        .onConflictDoNothing();
     },
     saveApproval: (approval) =>
       db.transaction(async (transaction) => {

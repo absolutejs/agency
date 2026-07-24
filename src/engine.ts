@@ -1,4 +1,4 @@
-import { actionBinding, digest } from "./canonical";
+import { actionBinding, canonicalJson, digest } from "./canonical";
 import type {
   ActionApproval,
   ActionRejection,
@@ -17,6 +17,25 @@ const required = <Value>(value: Value | undefined, message: string): Value => {
 
   return value;
 };
+
+const sameActionRequest = (left: ActionRequest, right: ActionRequest) =>
+  canonicalJson({
+    ...left,
+    createdAt: undefined,
+  }) ===
+  canonicalJson({
+    ...right,
+    createdAt: undefined,
+  });
+
+const sameApproval = (
+  existing: ActionApproval,
+  proposed: ActionApproval,
+) =>
+  existing.approvedBy === proposed.approvedBy &&
+  existing.bindingDigest === proposed.bindingDigest &&
+  canonicalJson(existing.conditions) === canonicalJson(proposed.conditions) &&
+  canonicalJson(existing.state) === canonicalJson(proposed.state);
 
 export const createAgency = ({
   control,
@@ -46,16 +65,31 @@ export const createAgency = ({
       input.expiresAt ?? Number.POSITIVE_INFINITY,
       delegation?.expiresAt ?? Number.POSITIVE_INFINITY,
     );
+    const actionId = input.idempotencyKey
+      ? `act_${await digest({
+          actorId: input.actor.agentId,
+          idempotencyKey: input.idempotencyKey,
+        })}`
+      : `act_${crypto.randomUUID()}`;
     const action: ActionRequest = {
       ...input,
       ...(Number.isFinite(delegatedExpiry)
         ? { expiresAt: delegatedExpiry }
         : {}),
-      actionId: `act_${crypto.randomUUID()}`,
+      actionId,
       createdAt,
       inputDigest: await digest(input.input ?? null),
     };
     await store.saveAction(action);
+    const persisted = required(
+      await store.getAction(actionId),
+      "Action was not persisted",
+    );
+    if (!sameActionRequest(persisted, action))
+      throw new Error("Idempotency key was already used for another action");
+    if (persisted.createdAt !== action.createdAt) {
+      return { action: persisted, decision: await decide(persisted) };
+    }
     await emit?.({ action, type: "action.requested" });
 
     return { action, decision: await decide(action) };
@@ -90,8 +124,12 @@ export const createAgency = ({
       conditions,
       state,
     };
-    if (!(await store.saveApproval(approval)))
+    if (!(await store.saveApproval(approval))) {
+      const existing = await store.getApproval(actionId);
+      if (existing !== undefined && sameApproval(existing, approval))
+        return existing;
       throw new Error("Action has already been decided");
+    }
     await emit?.({ actionId, approval, type: "action.approved" });
 
     return approval;
