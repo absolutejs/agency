@@ -1,6 +1,6 @@
 {
   "name": "@absolutejs/agency",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "description": "Provider-agnostic AI agent authorization with policy, approvals, rejections, durable delegation, execution leases, receipts, kill switches, and signed handoffs.",
   "type": "module",
   "license": "MIT",

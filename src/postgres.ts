@@ -22,9 +22,19 @@ const namespaceOf = (namespace: string) => {
   return namespace;
 };
 
-export const agencyPostgresSchemaSql = (namespace = "agency") => {
+export type AgencyPostgresMigration = {
+  id: string;
+  sql: string;
+};
+
+export const agencyPostgresMigrations = (
+  namespace = "agency",
+): ReadonlyArray<AgencyPostgresMigration> => {
   const ns = namespaceOf(namespace);
-  return `CREATE SCHEMA IF NOT EXISTS ${ns};
+  return [
+    {
+      id: "agency@0.5.0",
+      sql: `CREATE SCHEMA IF NOT EXISTS ${ns};
 CREATE TABLE IF NOT EXISTS ${ns}.actions (
   action_id text PRIMARY KEY,
   actor_id text NOT NULL,
@@ -36,12 +46,6 @@ CREATE TABLE IF NOT EXISTS ${ns}.approvals (
   action_id text PRIMARY KEY REFERENCES ${ns}.actions(action_id) ON DELETE CASCADE,
   actor_id text NOT NULL,
   approved_at bigint NOT NULL,
-  data jsonb NOT NULL
-);
-CREATE TABLE IF NOT EXISTS ${ns}.rejections (
-  action_id text PRIMARY KEY REFERENCES ${ns}.actions(action_id) ON DELETE CASCADE,
-  actor_id text NOT NULL,
-  rejected_at bigint NOT NULL,
   data jsonb NOT NULL
 );
 CREATE TABLE IF NOT EXISTS ${ns}.leases (
@@ -80,8 +84,24 @@ CREATE TABLE IF NOT EXISTS ${ns}.delegations (
 );
 CREATE INDEX IF NOT EXISTS delegations_subject_idx ON ${ns}.delegations (subject_agent_id, expires_at DESC);
 CREATE INDEX IF NOT EXISTS delegations_issuer_idx ON ${ns}.delegations (issuer_agent_id, expires_at DESC);
-CREATE INDEX IF NOT EXISTS delegations_parent_idx ON ${ns}.delegations (parent_delegation_id);`;
+CREATE INDEX IF NOT EXISTS delegations_parent_idx ON ${ns}.delegations (parent_delegation_id);`,
+    },
+    {
+      id: "agency-rejections@0.7.0",
+      sql: `CREATE TABLE IF NOT EXISTS ${ns}.rejections (
+  action_id text PRIMARY KEY REFERENCES ${ns}.actions(action_id) ON DELETE CASCADE,
+  actor_id text NOT NULL,
+  rejected_at bigint NOT NULL,
+  data jsonb NOT NULL
+);`,
+    },
+  ];
 };
+
+export const agencyPostgresSchemaSql = (namespace = "agency") =>
+  agencyPostgresMigrations(namespace)
+    .map(({ sql }) => sql)
+    .join("\n");
 
 type DataRow<Value> = { data: Value };
 

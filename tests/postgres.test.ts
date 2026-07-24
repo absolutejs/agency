@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+  agencyPostgresMigrations,
   agencyPostgresSchemaSql,
   createPostgresAgencyStore,
   createPostgresHandoffReplayStore,
@@ -14,6 +15,19 @@ describe("Agency PostgreSQL adapters", () => {
     expect(sql).toContain("agent_state.rejections");
     expect(() => agencyPostgresSchemaSql("public; DROP TABLE users")).toThrow(
       "simple identifier",
+    );
+  });
+
+  test("exports immutable versioned migrations for durable journals", () => {
+    const migrations = agencyPostgresMigrations("agent_state");
+    expect(migrations.map(({ id }) => id)).toEqual([
+      "agency@0.5.0",
+      "agency-rejections@0.7.0",
+    ]);
+    expect(migrations[0]?.sql).not.toContain("agent_state.rejections");
+    expect(migrations[1]?.sql).toContain("agent_state.rejections");
+    expect(migrations.map(({ sql }) => sql).join("\n")).toBe(
+      agencyPostgresSchemaSql("agent_state"),
     );
   });
 

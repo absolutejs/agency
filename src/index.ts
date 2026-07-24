@@ -40,11 +40,13 @@ export {
   createDrizzleHandoffReplayStore,
 } from "./drizzle";
 export {
+  agencyPostgresMigrations,
   agencyPostgresSchemaSql,
   createPostgresAgencyStore,
   createPostgresAgentDelegationStore,
   createPostgresAgentControlStore,
   createPostgresHandoffReplayStore,
+  type AgencyPostgresMigration,
   type AgencySqlClient,
   type AgencySqlResult,
 } from "./postgres";
