@@ -1,6 +1,6 @@
 {
   "name": "@absolutejs/agency",
-  "version": "0.7.2",
+  "version": "0.7.3",
   "description": "Provider-agnostic AI agent authorization with policy, approvals, rejections, durable delegation, execution leases, receipts, kill switches, and signed handoffs.",
   "type": "module",
   "license": "MIT",
@@ -47,11 +47,12 @@
     "typecheck": "tsc --noEmit",
     "test": "bun test tests/",
     "format": "prettier --write \"./**/*.{ts,json,md}\"",
-    "check:package": "bun run typecheck && bun run test && bun run build",
+    "verify-package": "absolute-manifest verify-package",
+    "check:package": "bun run typecheck && bun run test && bun run verify-package && bun run build && bun run verify-package --artifacts",
     "release": "bun run format && bun run check:package && bun publish"
   },
   "dependencies": {
-    "@absolutejs/manifest": "^0.4.0",
+    "@absolutejs/manifest": "^0.7.2",
     "@sinclair/typebox": "^0.34.0"
   },
   "devDependencies": {
@@ -61,7 +62,22 @@
     "drizzle-orm": "1.0.0-rc.4"
   },
   "absolutejs": {
-    "manifestContract": 2
+    "manifestContract": 2,
+    "runtimePeers": {
+      "drizzle-orm": {
+        "artifactImports": [
+          "drizzle-orm",
+          "drizzle-orm/pg-core"
+        ],
+        "range": ">=1.0.0-rc.4 <2",
+        "tested": "1.0.0-rc.4",
+        "optional": false,
+        "buildExternals": [
+          "drizzle-orm",
+          "drizzle-orm/*"
+        ]
+      }
+    }
   },
   "peerDependencies": {
     "drizzle-orm": ">=1.0.0-rc.4 <2"
