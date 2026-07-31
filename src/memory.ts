@@ -9,7 +9,27 @@ import type {
 
 const clone = <Value>(value: Value): Value => structuredClone(value);
 
-export const createMemoryAgencyStore = (): AgencyStore => {
+export type MemoryAgencyStore = AgencyStore & {
+  /**
+   * Overwrite a stored action, bypassing the idempotency guard on
+   * `saveAction`. This is the only way to simulate an out-of-band mutation —
+   * a record edited behind the engine's back — which is what the
+   * approval-input-binding conformance scenario has to reproduce to prove
+   * `issueLease` rejects an action whose input changed after approval.
+   *
+   * Not part of {@link AgencyStore}: production code has no reason to replace
+   * an action, and durable stores should not offer it.
+   */
+  replaceAction: (action: ActionRequest) => Promise<void>;
+};
+
+/**
+ * In-memory store for tests and conformance harnesses.
+ *
+ * Returns {@link MemoryAgencyStore} rather than a bare {@link AgencyStore} so a
+ * harness can reach `replaceAction` — see the note there.
+ */
+export const createMemoryAgencyStore = (): MemoryAgencyStore => {
   const actions = new Map<string, ActionRequest>();
   const approvals = new Map<string, ActionApproval>();
   const leases = new Map<string, ExecutionLease>();
@@ -83,6 +103,13 @@ export const createMemoryAgencyStore = (): AgencyStore => {
             actorForAction(rejection.actionId) === actorId,
         )
         .map(clone),
+    replaceAction: async (action) => {
+      actions.set(action.actionId, clone(action));
+    },
+    // Deliberately does NOT overwrite: request() saves, re-reads, and compares,
+    // which is how a reused idempotency key carrying a different payload is
+    // detected. Overwriting here would make that check compare the action to
+    // itself and silently accept the swap.
     saveAction: async (action) => {
       if (!actions.has(action.actionId))
         actions.set(action.actionId, clone(action));

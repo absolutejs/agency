@@ -1,6 +1,6 @@
 export { actionBinding, canonicalJson, digest } from "./canonical";
 export { createAgency, type Agency } from "./engine";
-export { createMemoryAgencyStore } from "./memory";
+export { createMemoryAgencyStore, type MemoryAgencyStore } from "./memory";
 export {
   createAgentDelegationAuthority,
   createMemoryAgentDelegationStore,
